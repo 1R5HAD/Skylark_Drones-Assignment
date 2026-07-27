@@ -2,11 +2,11 @@
 The BI agent itself: an LLM tool-use loop over two data sources
 (Work Orders, Deals) pulled live from monday.com.
 
-Uses Groq's free API (OpenAI-compatible) running Llama 3.3 70B, so this
-runs at zero cost. Swap GROQ_API_KEY / MODEL / base_url below if you'd
-rather point this at Anthropic, OpenAI, or Gemini's OpenAI-compat
-endpoint later -- the tool-use loop itself is standard OpenAI-style
-function calling and doesn't need to change.
+Uses Google's Gemini API (OpenAI-compatible endpoint) running
+Gemini 3.5 Flash-Lite, so this runs on Gemini's free tier. Swap
+GEMINI_API_KEY / MODEL / base_url below if you'd rather point this
+at Anthropic, OpenAI, or Groq later -- the tool-use loop itself is
+standard OpenAI-style function calling and doesn't need to change.
 
 Design (kept deliberately simple):
 - Two tools only.
@@ -34,10 +34,10 @@ from openai import OpenAI, BadRequestError
 from monday_client import MondayClient
 from normalize import normalize_board
 
-# Groq's free, OpenAI-compatible endpoint. Get a key at console.groq.com
-# (no credit card needed).
-GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+# Gemini's free, OpenAI-compatible endpoint. Get a key at
+# aistudio.google.com (no credit card needed).
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 BOARD_IDS = {
     "work_orders": os.environ.get("MONDAY_WORK_ORDERS_BOARD_ID"),
@@ -109,11 +109,11 @@ TOOLS = [
 
 
 class BIAgent:
-    def __init__(self, groq_api_key: str | None = None):
-        api_key = groq_api_key or os.environ.get("GROQ_API_KEY")
+    def __init__(self, gemini_api_key: str | None = None):
+        api_key = gemini_api_key or os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise RuntimeError("GROQ_API_KEY is not set. Add it to your environment or .env file.")
-        self.client = OpenAI(api_key=api_key, base_url=GROQ_BASE_URL)
+            raise RuntimeError("GEMINI_API_KEY is not set. Add it to your environment or .env file.")
+        self.client = OpenAI(api_key=api_key, base_url=GEMINI_BASE_URL)
         self.monday = MondayClient()
         self._board_cache: dict[str, pd.DataFrame] = {}
         self._caveats: dict[str, list[str]] = {}
@@ -218,6 +218,11 @@ class BIAgent:
                     max_tokens=2000,
                 )
             except BadRequestError as e:
+                # NOTE: "tool_use_failed" is Groq's error code for a malformed
+                # function call. Gemini's OpenAI-compat layer may raise a
+                # differently-worded error for the same failure -- confirm this
+                # string (or replace it) by deliberately triggering a malformed
+                # tool call and inspecting str(e) before relying on this path.
                 if "tool_use_failed" in str(e) and not malformed_retry_used:
                     # Model emitted a malformed function call. Nudge it once and retry
                     # rather than surfacing a raw API error to the user.

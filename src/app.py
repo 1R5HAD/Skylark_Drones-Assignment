@@ -418,7 +418,7 @@ with st.sidebar:
 if st.session_state.error:
     st.error(
         "Agent failed to initialize: "
-        f"{st.session_state.error}\n\nCheck MONDAY_API_TOKEN and GROQ_API_KEY are set."
+        f"{st.session_state.error}\n\nCheck MONDAY_API_TOKEN and GEMINI_API_KEY are set."
     )
     st.stop()
 
