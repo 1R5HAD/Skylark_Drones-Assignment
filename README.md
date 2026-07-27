@@ -14,6 +14,8 @@ _No hardcoded CSVs. No stale exports. Just ask._
 
 </div>
 
+Working link : https://skylarkdrones-assignment-by-irshad.streamlit.app
+
 ---
 
 > **What this is:** a chat agent that answers founder-level questions —
