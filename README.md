@@ -1,6 +1,6 @@
 # Skylark Drones — monday.com BI Agent
 
-Working link : https://skylarkdrones-assignment-by-irshad.streamlit.app/
+Working link : https://skylarkdrones-assignment-by-irshad.streamlit.app
 
 A conversational agent that answers founder-level business questions
 by querying two live monday.com boards (Work Orders, Deals) — no
