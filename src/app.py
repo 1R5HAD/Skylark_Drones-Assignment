@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -287,8 +288,66 @@ section[data-testid="stSidebar"] hr {
     padding-top: 1rem;
     border-top: 1px solid var(--border-subtle);
 }
+
+/* ── Status container tweaks ── */
+[data-testid="stStatusWidget"] {
+    border-radius: 12px !important;
+    border: 1px solid var(--border-subtle) !important;
+}
+
+/* ── Thinking expander ── */
+[data-testid="stExpander"] {
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 12px !important;
+    background: rgba(108,99,255,0.03) !important;
+}
+[data-testid="stExpander"] summary {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: var(--text-muted) !important;
+}
 </style>
 """, unsafe_allow_html=True)
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _render_thinking_expander(tool_log: list[dict]):
+    """Render an expandable section showing the agent's tool-call steps."""
+    n = len(tool_log)
+    with st.expander(f"🧠 Agent reasoning — {n} step{'s' if n != 1 else ''}", expanded=False):
+        for i, step in enumerate(tool_log, 1):
+            name = step["name"]
+            args = step["args"]
+            result = step["result"]
+
+            if name == "get_data_summary":
+                board = args.get("board", "?")
+                rows_m = re.search(r"rows:\s*(\d+)", result)
+                cols_m = re.search(r"columns:\s*(\d+)", result)
+                rows_n = rows_m.group(1) if rows_m else "?"
+                cols_n = cols_m.group(1) if cols_m else "?"
+                st.markdown(
+                    f"**Step {i} · 📊 Data Summary** — `{board}` "
+                    f"({rows_n} rows, {cols_n} columns)"
+                )
+            elif name == "run_analysis":
+                st.markdown(f"**Step {i} · 🐍 Analysis**")
+                st.code(args.get("code", ""), language="python")
+                if result and not result.startswith("Error"):
+                    preview = result[:500]
+                    if len(result) > 500:
+                        preview += "\n… (truncated)"
+                    st.caption("Output:")
+                    st.code(preview, language="text")
+                elif result and result.startswith("Error"):
+                    st.error(result)
+            else:
+                st.markdown(f"**Step {i} · 🔧 `{name}`**")
+
+            if i < n:
+                st.divider()
+
 
 # ── Session state init ───────────────────────────────────────────────────────
 if "agent" not in st.session_state:
@@ -302,7 +361,7 @@ if "agent" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []  # Anthropic-format history
 if "display_messages" not in st.session_state:
-    st.session_state.display_messages = []  # what we render (text only)
+    st.session_state.display_messages = []  # what we render (text + optional tool_log)
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -386,6 +445,8 @@ if not st.session_state.display_messages:
 for m in st.session_state.display_messages:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
+        if m.get("tool_log"):
+            _render_thinking_expander(m["tool_log"])
 
 # ── Chat input & response ───────────────────────────────────────────────────
 if prompt := st.chat_input("e.g. How's our pipeline looking for the energy sector this quarter?"):
@@ -396,12 +457,57 @@ if prompt := st.chat_input("e.g. How's our pipeline looking for the energy secto
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     with st.chat_message("assistant"):
-        with st.spinner("🔍 Analysing the boards..."):
+        tool_log: list[dict] = []
+
+        with st.status("🔍 Analysing the boards…", expanded=True) as status:
+
+            def _on_tool_call(name: str, args: dict, result: str):
+                tool_log.append({"name": name, "args": args, "result": result})
+                step = len(tool_log)
+
+                if name == "get_data_summary":
+                    board = args.get("board", "?")
+                    rows_m = re.search(r"rows:\s*(\d+)", result)
+                    cols_m = re.search(r"columns:\s*(\d+)", result)
+                    rows_n = rows_m.group(1) if rows_m else "?"
+                    cols_n = cols_m.group(1) if cols_m else "?"
+                    st.markdown(
+                        f"➜ **Step {step}** · 📊 Fetched `{board}` board "
+                        f"— {rows_n} rows, {cols_n} columns"
+                    )
+                elif name == "run_analysis":
+                    first_line = args.get("code", "").split("\n")[0][:60]
+                    st.markdown(f"➜ **Step {step}** · 🐍 `{first_line}…`")
+                else:
+                    st.markdown(f"➜ **Step {step}** · 🔧 `{name}`")
+
+                status.update(label=f"🔧 Step {step}: {name}…")
+
             try:
-                reply, updated_history = st.session_state.agent.ask(st.session_state.messages)
+                reply, updated_history = st.session_state.agent.ask(
+                    st.session_state.messages,
+                    on_tool_call=_on_tool_call,
+                )
                 st.session_state.messages = updated_history
             except Exception as e:
                 reply = f"Something went wrong answering that: {e}"
+
+            if tool_log:
+                status.update(
+                    label=f"✅ Completed — {len(tool_log)} tool call{'s' if len(tool_log) != 1 else ''}",
+                    state="complete",
+                    expanded=False,
+                )
+            else:
+                status.update(label="✅ Done", state="complete", expanded=False)
+
         st.markdown(reply)
 
-    st.session_state.display_messages.append({"role": "assistant", "content": reply})
+        if tool_log:
+            _render_thinking_expander(tool_log)
+
+    st.session_state.display_messages.append({
+        "role": "assistant",
+        "content": reply,
+        "tool_log": tool_log if tool_log else None,
+    })

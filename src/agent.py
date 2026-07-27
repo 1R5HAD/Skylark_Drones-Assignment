@@ -191,7 +191,7 @@ class BIAgent:
 
     # ---- main entry point ----
 
-    def ask(self, conversation: list[dict]) -> tuple[str, list[dict]]:
+    def ask(self, conversation: list[dict], *, on_tool_call=None, max_turns: int = 15) -> tuple[str, list[dict]]:
         """
         conversation: list of {"role": "user"|"assistant", "content": ...} in OpenAI format
         (no system message included -- it's added here each call).
@@ -199,8 +199,16 @@ class BIAgent:
         """
         messages = [{"role": "system", "content": SYSTEM_PROMPT}] + list(conversation)
         malformed_retry_used = False
+        turn = 0
 
         while True:
+            turn += 1
+            if turn > max_turns:
+                return (
+                    "I've reached my analysis step limit for this question. "
+                    "Could you try breaking it into smaller parts?",
+                    messages[1:],
+                )
             try:
                 response = self.client.chat.completions.create(
                     model=MODEL,
@@ -234,6 +242,8 @@ class BIAgent:
             for tc in msg.tool_calls:
                 args = json.loads(tc.function.arguments or "{}")
                 output = self._run_tool(tc.function.name, args)
+                if on_tool_call:
+                    on_tool_call(tc.function.name, args, output)
                 messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "content": output}
                 )
