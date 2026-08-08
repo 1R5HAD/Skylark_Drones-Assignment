@@ -44,7 +44,7 @@ BOARD_IDS = {
     "deals": os.environ.get("MONDAY_DEALS_BOARD_ID"),
 }
 
-SYSTEM_PROMPT = """You are a business intelligence analyst for Skylark Drones, a drone-services \
+SYSTEM_PROMPT = """You are a business intelligence analyst for BoardWise, a drone-services \
 company. Founders and executives ask you questions about two live monday.com boards:
 
 - "work_orders": project execution data (status, sector, dates, billing/collection amounts).

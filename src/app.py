@@ -8,7 +8,7 @@ from agent import BIAgent
 
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Skylark BI Agent",
+    page_title="BoardWise — BI Agent",
     page_icon="🛸",
     layout="centered",
     initial_sidebar_state="expanded",
@@ -369,7 +369,7 @@ with st.sidebar:
     <div style="text-align:center; padding: 0.5rem 0 0.3rem;">
         <span style="font-size:1.8rem;">🛸</span>
         <div style="font-size:1.1rem; font-weight:700; color:#e8eaf0; margin-top:0.15rem;
-                    letter-spacing:0.03em;">Skylark BI</div>
+                    letter-spacing:0.03em;">BoardWise <span style="font-size:0.7rem;font-weight:400;color:#9ca3b4;">BI Agent</span></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -427,7 +427,7 @@ if not st.session_state.display_messages:
     st.markdown("""
     <div class="hero-section">
         <div class="hero-icon">🛸</div>
-        <h1>Skylark BI Agent</h1>
+        <h1>BoardWise <span style="font-size:1.2rem;font-weight:400;color:#9ca3b4;">BI Agent</span></h1>
         <div class="hero-subtitle">
             Ask anything about your pipeline, deal flow, project execution, sectors,
             or billing — powered by live monday.com data.

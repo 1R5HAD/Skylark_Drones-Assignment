@@ -1,8 +1,11 @@
-# Skylark Drones — monday.com BI Agent
+# BoardWise — monday.com BI Agent
 
 A conversational agent that answers founder-level business questions
 by querying two live monday.com boards (Work Orders, Deals) — no
 hardcoded data.
+
+See [`DECISION_LOG.md`](./DECISION_LOG.md) for assumptions, trade-offs,
+and interpretation notes (required deliverable for this assignment).
 
 ## Architecture
 
@@ -10,7 +13,7 @@ hardcoded data.
 Streamlit chat (app.py)
         │
         ▼
-   BIAgent (agent.py)  ── Claude, tool-use loop
+   BIAgent (agent.py)  ── Gemini 3.5 Flash-Lite, tool-use loop
         │
    ┌────┴─────┐
    ▼          ▼
@@ -28,10 +31,15 @@ MondayClient  ── GraphQL, paginated, read-only
 monday.com API
 ```
 
-Runs on **Groq's free API** (Llama 3.3 70B, OpenAI-compatible tool
-calling) — no cost to run or demo. Swapping to a different provider
-(Anthropic, OpenAI, Gemini) later only touches `agent.py`'s client
-setup; the tool-use loop is standard OpenAI-style function calling.
+Runs on **Google Gemini's free tier** (Gemini 3.5 Flash-Lite, via its
+OpenAI-compatible endpoint) — no cost to run or demo. The project
+started on Groq (Llama 3.3 70B) and switched mid-build after hitting
+Groq's daily token cap during testing; Gemini's free tier gives more
+daily headroom for a tool-use loop that replays conversation history
+each turn. See the Decision Log for the full reasoning. Swapping to a
+different provider (Anthropic, OpenAI, Groq) later only touches
+`agent.py`'s client setup — six lines, all constants — since the
+tool-use loop is standard OpenAI-style function calling.
 
 **Why this shape:** rather than hand-coding a query for every
 possible founder question ("pipeline by sector", "revenue this
@@ -57,7 +65,9 @@ native Date/Number columns.
 
 ### 2. Get your API keys
 
-- **Groq (free, no credit card):** console.groq.com → sign up → API Keys → create key. Powers the agent's reasoning (Llama 3.3 70B) at zero cost.
+- **Gemini (free, no credit card):** aistudio.google.com → sign in →
+  Get API Key → create key. Powers the agent's reasoning (Gemini 3.5
+  Flash-Lite) at zero cost.
 - **monday.com token:** monday.com → avatar (bottom-left) → **Developers** → **My
   access tokens**.
 - **Board ID:** open the board, copy just the number from the URL
@@ -67,7 +77,7 @@ native Date/Number columns.
 
 ```bash
 cp .env.example .env
-# fill in GROQ_API_KEY, MONDAY_API_TOKEN,
+# fill in GEMINI_API_KEY, MONDAY_API_TOKEN,
 # MONDAY_WORK_ORDERS_BOARD_ID, MONDAY_DEALS_BOARD_ID
 ```
 
@@ -106,7 +116,7 @@ in the app's Secrets manager, set the main file path to `src/app.py`.
 | File | Purpose |
 |---|---|
 | `src/app.py` | Streamlit chat UI |
-| `src/agent.py` | Claude tool-use loop, system prompt, tool implementations |
+| `src/agent.py` | Gemini tool-use loop, system prompt, tool implementations |
 | `src/monday_client.py` | Read-only monday.com GraphQL client with pagination |
 | `src/normalize.py` | Cleans raw board data into pandas DataFrames + caveats |
 
